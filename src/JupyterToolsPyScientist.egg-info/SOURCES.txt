@@ -1,0 +1,7 @@
+setup.py
+src/JupyterTollsPyScientist/__init__.py
+src/JupyterTollsPyScientist/jupyter_tools.py
+src/JupyterToolsPyScientist.egg-info/PKG-INFO
+src/JupyterToolsPyScientist.egg-info/SOURCES.txt
+src/JupyterToolsPyScientist.egg-info/dependency_links.txt
+src/JupyterToolsPyScientist.egg-info/top_level.txt
