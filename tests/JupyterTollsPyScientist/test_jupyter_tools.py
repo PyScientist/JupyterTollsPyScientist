@@ -31,8 +31,14 @@ class PlottingTestCase(unittest.TestCase):
     def test_make_preprocessing_kansas(self):
         self.assertTrue('Depth' in self.test_df_kansas.columns)
 
-    def test_create_layout(self):
-        PetrophysicalLayout(self.test_df_norway)
+    def test_create_layout_norway(self):
+        norway_layout = PetrophysicalLayout(self.test_df_norway)
+        self.assertEqual(len(norway_layout.tracks_dict), 6)
+
+    def test_create_layout_kansas(self):
+        kansas_layout = PetrophysicalLayout(self.test_df_kansas)
+        self.assertEqual(len(kansas_layout.tracks_dict), 6)
+
 
 
 class PreparingModel(unittest.TestCase):

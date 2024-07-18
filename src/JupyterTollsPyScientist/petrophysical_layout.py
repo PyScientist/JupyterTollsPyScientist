@@ -1,3 +1,5 @@
+from typing import Tuple, Any
+
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -59,7 +61,7 @@ def dataframe_preprocessor(input_df, mnem_dict=None):
 
 
 class PetrophysicalTrack:
-    def __init__(self, curves, track_main_ax, track_type, df, depth_range):
+    def __init__(self, track_description, track_main_ax, df, depth_range):
 
         self.df = df
         self.track_main_ax = track_main_ax
@@ -67,7 +69,7 @@ class PetrophysicalTrack:
 
         # Adjust main axes.
         self.track_main_ax.set_xticks([])
-        if track_type == 'main':
+        if track_description['type'] == 'main':
             self.track_main_ax.set(ylabel='Depth, m')
             self.track_main_ax.yaxis.label.set_fontsize(18)
             self.track_main_ax.set(ylim=self.depth_range)
@@ -80,29 +82,34 @@ class PetrophysicalTrack:
         # assignment from the PetrophysicalLayout class. 
         self.twins_dict = {}
         self.logs_dict = {}
-        for twin_id, curve in enumerate(curves.keys()):
+        for twin_id, curve in enumerate(track_description['curves'].keys()):
             # To ensure that we got curve before we start any operations with it
             if curve in self.df.columns:
+
+                # Create twin of main axes for each curve and put link to it in dict
                 self.twins_dict.update({twin_id: track_main_ax.twiny()})
 
                 # twin_id is sequential number of curve or plot line, scatter, etc... in current track
                 shift = 1 + twin_id * 0.06
                 self.twins_dict[twin_id].spines.top.set_position(("axes", shift))
                 self.logs_dict.update({twin_id: self.twins_dict[twin_id].plot(df[curve],
-                                                                              df['Depth'],
-                                                                              color=curves[curve]['color'],
-                                                                              label=curves[curve]['label'])})
+                     df['Depth'],
+                     color=track_description['curves'][curve]['color'],
+                     label=track_description['curves'][curve]['label'])})
 
                 # Perform adjusting of auxiliary axes
-                self.twins_dict[twin_id].set(xlabel=curves[curve]['label'])
+                self.twins_dict[twin_id].set(xlabel=track_description['curves'][curve]['label'])
                 self.twins_dict[twin_id].xaxis.label.set_color(self.logs_dict[twin_id][0].get_color())
                 self.twins_dict[twin_id].tick_params(axis='x', colors=self.logs_dict[twin_id][0].get_color())
                 self.twins_dict[twin_id].xaxis.label.set_fontsize(18)
 
-                # Adjust scales and ranges, fill between curve and other curve/margin of the plot.
+                # Adjust scales and ranges,
                 self.define_scales(curve_name=curve,
-                                   graph_inst=self.logs_dict[twin_id],
                                    ax=self.twins_dict[twin_id])
+                # Adjust fill between curves and appearance of curves.
+                self.define_appearance(curve_name=curve,
+                                       graph_inst=self.logs_dict[twin_id],
+                                       ax=self.twins_dict[twin_id])
 
         # Adding grid to the main axes if at least one curve on track exists
         if self.twins_dict != {}:
@@ -111,33 +118,31 @@ class PetrophysicalTrack:
         self.track_main_ax.grid(which='major', axis='y', alpha=0.8)
         self.track_main_ax.grid(which='minor', axis='y', alpha=0.3)
 
-    def define_scales(self, curve_name, graph_inst, ax):
+    def define_scales(self, curve_name, ax):
         # Adjust scale and ranges for particular curves.
-        if curve_name in ['ResistivityDeep', 'ResistivityShallow', 'ResistivityMicro',
-                          'sPI_RU', 'sPI_RU_predicted', 'PERM']:
+        if curve_name in ['ResistivityDeep', 'ResistivityShallow', 'ResistivityMicro', 'PERM']:
             ax.set_xscale('log')
             ax.set_xlim(0.1, 10000)
         if curve_name in ['Density']:
             ax.set_xlim(1.95, 2.95)
             ax.invert_xaxis()
         if curve_name in ['Sonic']:
-            ax.set_xlim(40, 100)
+            ax.set_xlim(40, 140)
         if curve_name in ['Neutron']:
             ax.set_xlim(-0.15, 0.45)
         if curve_name in ['PhotoelectricFactor']:
-            ax.set_xlim(1, 6)
+            ax.set_xlim(1, 11)
         if curve_name in ['Caliper', 'Bitsize']:
-            ax.set_xlim(8, 21)
-        if curve_name in ['sPI_RU']:
+            ax.set_xlim(5, 21)
+
+        if curve_name in ['sPI_RU', 'sPI_RU_predicted']:
+            ax.set_xscale('log')
             ax.set_xlim(0.002, 200)
-        if curve_name in ['sPI_RU_predicted']:
-            ax.set_xlim(0.002, 200)
+
         if curve_name in ['log_sPI_RU_predicted']:
             ax.set_xlim(np.log10(0.002), np.log10(200))
 
-        # Add fill between curve and maximum/minimum value or between curves.
-        if curve_name in ['sPI_RU']:
-            ax.fill_betweenx(self.df['Depth'], self.df[curve_name], color='skyblue', alpha=0.4)
+    def define_appearance(self, curve_name, graph_inst, ax):
 
         if (curve_name in ['Caliper']) & ('Bitsize' in self.df.columns):
             ax.fill_betweenx(self.df['Depth'],
@@ -152,6 +157,10 @@ class PetrophysicalTrack:
         if curve_name in ['Bitsize']:
             graph_inst[0].set_linestyle('--')
             graph_inst[0].set_linewidth(1)
+
+        # Add fill between curve and maximum/minimum value or between curves.
+        if curve_name in ['sPI_RU']:
+            ax.fill_betweenx(self.df['Depth'], self.df[curve_name], color='skyblue', alpha=0.4)
 
 
 class PetrophysicalLayout:
@@ -198,7 +207,7 @@ class PetrophysicalLayout:
          },
     ]
 
-    def __init__(self, df, tracks_description=None, depth_range=(-9999.25, 100)):
+    def __init__(self, df, tracks_description=None, depth_range=(-9999.25, 9999.25)):
 
         self.df = df
 
@@ -226,17 +235,20 @@ class PetrophysicalLayout:
         """Prepare a figure using Matplotlib, assign a number of axes to plot tracks based
         on the provided dictionary, and propagate the data to the created axes."""
 
+        # Drop values if at least three curves are not empty.
         df_dropped = self.df.dropna(thresh=3)
+
         # Set depth range if depth range is not specified by user.
-        if self.depth_range == (-9999.25, 100):
+        if self.depth_range == (-9999.25, 9999.25):
             self.depth_range = (df_dropped['Depth'].min() - 15, df_dropped['Depth'].max() + 15)
 
+        # Add data in each track according to tracks_description
         for track_id, track in enumerate(self.tracks_description):
-            self.tracks_dict.update({track_id: PetrophysicalTrack(track['curves'],
+            self.tracks_dict.update({track_id: PetrophysicalTrack(track,
                                                                   self.ax[track_id],
-                                                                  track['type'],
                                                                   self.df,
                                                                   self.depth_range)})
+
         self.fig.suptitle(f"Layout of {self.df['Well'].unique()[0]}", fontsize=18, ha='left', x=0.0)
         self.fig.tight_layout()
 
