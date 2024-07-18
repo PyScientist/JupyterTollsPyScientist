@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=70.3.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "JupyterToolsPyScientist"
+version = "1.0.0.dev0"
+authors = [
+  { name="Sergei Dmitriev", email="sergei-dmitriev@mail.ru" },
+]
+description = "Tools for simplifying work with ML in jupyter"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]

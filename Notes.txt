@@ -1,6 +1,4 @@
-Install packages "python -m pip install wheel, build, setuptools"
-Install the package "python -m pip install pipenv"
-Create environment (Pipfile and Pipfile.lock) "pipenv install"
-Create setup.py in root of the project
-To create a wheel "python -m build --wheel"
+Install packages necessary for packaging "python -m pip install wheel, build, setuptools"
+Create pyproject.toml in root of the project
+To create a wheel "python -m build"
 

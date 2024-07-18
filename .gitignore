@@ -1,2 +1,4 @@
-/build/
 /venv/
+/src/JupyterToolsPyScientist.egg-info/
+/dist/
+/.idea/

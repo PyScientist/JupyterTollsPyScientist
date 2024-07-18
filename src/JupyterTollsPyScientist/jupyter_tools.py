@@ -5,15 +5,18 @@ import pandas as pd
 import matplotlib
 
 
-def add_grid(axes: matplotlib.axes._axes.Axes) -> None:
+def add_grid(axes: matplotlib.axes._axes.Axes) -> bool:
     """Function adding grid with necessary format to given axes
     :param axes: object of matplotlib axes
     :returns: None
     """
-    axes.grid(color='grey', linestyle='-', linewidth=0.5, which='major', axis='both')
-    axes.grid(color='lightblue', linestyle='-', linewidth=0.5, which='minor', axis='both')
-    axes.minorticks_on()
-    return 1
+    try:
+        axes.grid(color='grey', linestyle='-', linewidth=0.5, which='major', axis='both')
+        axes.grid(color='lightblue', linestyle='-', linewidth=0.5, which='minor', axis='both')
+        axes.minorticks_on()
+        return True
+    except Exception as err:
+        return Flase
 
 
 def random_forest_model_generation(best_rf_params, X_train, y_train, X_test, y_test):
