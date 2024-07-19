@@ -34,6 +34,7 @@ class PlottingTestCase(unittest.TestCase):
     def test_create_layout_norway(self):
         norway_layout = PetrophysicalLayout(self.test_df_norway)
         self.assertEqual(len(norway_layout.tracks_dict), 6)
+        self.assertEqual(len(norway_layout.tracks_dict[0].logs_dict), 1)
 
     def test_create_layout_kansas(self):
         kansas_layout = PetrophysicalLayout(self.test_df_kansas)

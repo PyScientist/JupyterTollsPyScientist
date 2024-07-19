@@ -33,6 +33,7 @@ def load_tracks_description(where=None):
                         'max': group['max'].values[_],
                         'scale': group['scale'].values[_],
                         'reverse': group['reverse'].values[_],
+                        'range_detection': group['range_detection'].values[_],
                          }
                    }
                 )

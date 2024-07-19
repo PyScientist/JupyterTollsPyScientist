@@ -71,6 +71,8 @@ class PetrophysicalTrack:
         self.df = df
         self.track_main_ax = track_main_ax
         self.depth_range = depth_range
+        self.twins_dict = {}
+        self.logs_dict = {}
 
         # Adjust main axes.
         self.track_main_ax.set_xticks([])
@@ -85,22 +87,23 @@ class PetrophysicalTrack:
 
         # Create auxiliary axes and plot curves on them according to given
         # assignment from the PetrophysicalLayout class.
-        self.twins_dict = {}
-        self.logs_dict = {}
         for twin_id, curve in enumerate(track_description['curves'].keys()):
-            # To ensure that we got curve before we start any operations with it
+            # To ensure that we got curve before we start any operations with it.
             if curve in self.df.columns:
-
-                # Create twin of main axes for each curve and put link to it in dict
+                # Create twin of main axes for each curve and put link to it in dict.
                 self.twins_dict.update({twin_id: track_main_ax.twiny()})
-
-                # twin_id is sequential number of curve or plot line, scatter, etc... in current track
+                # twin_id is sequential number of curve/points in current track.
                 shift = 1 + twin_id * 0.06
                 self.twins_dict[twin_id].spines.top.set_position(("axes", shift))
-                self.logs_dict.update({twin_id: self.twins_dict[twin_id].plot(df[curve],
-                     df['Depth'],
-                     color=track_description['curves'][curve]['color'],
-                     label=track_description['curves'][curve]['label'])})
+
+                graphic_link = self.twins_dict[twin_id].plot(
+                        df[curve],
+                        df['Depth'],
+                        color=track_description['curves'][curve]['color'],
+                        label=f"{track_description['curves'][curve]['label']}, "
+                              f"{track_description['curves'][curve]['unit']}")
+
+                self.logs_dict.update({twin_id: graphic_link})
 
                 # Perform adjusting of auxiliary axes
                 self.twins_dict[twin_id].set(xlabel=track_description['curves'][curve]['label'])
@@ -130,6 +133,18 @@ class PetrophysicalTrack:
             ax.set_xscale('log')
         if curve['min'] != np.nan and curve['max'] != np.nan:
             ax.set_xlim(curve['min'], curve['max'])
+
+        if curve['range_detection'] == 'auto':
+            max_val = self.df[curve_name].quantile(0.95)
+            min_val = self.df[curve_name].quantile(0.05)
+            if not np.isnan(max_val) and not np.isnan(min_val) and max_val > min_val:
+                range_val = (max_val - min_val)*0.05
+                ax.set_xlim(self.custom_round(min_val-range_val),
+                            self.custom_round(max_val+range_val))
+            else:
+                ax.set_xlim(self.custom_round(self.df[curve_name].min()),
+                            self.custom_round(self.df[curve_name].max()))
+
         if curve['reverse']:
             ax.invert_xaxis()
 
@@ -152,6 +167,17 @@ class PetrophysicalTrack:
         # Add fill between curve and maximum/minimum value or between curves.
         if curve_name in ['sPI_RU']:
             ax.fill_betweenx(self.df['Depth'], self.df[curve_name], color='skyblue', alpha=0.4)
+
+    @staticmethod
+    def custom_round(value):
+        if value > 100:
+            return round(value)
+        elif value > 10:
+            return round(value, 1)
+        elif value > 1:
+            return round(value, 2)
+        else:
+            return round(value, 3)
 
 
 def create_single_well_df(las_path, mnem_dict_path=None):
