@@ -11,10 +11,10 @@ from .utils import load_tracks_description, load_mnemonic_aliases_correspond
 class PetrophysicalLayout:
     """This class serves as a base object for layout.
     :param df: pandas dataframe with dataset from single las file.
-    :param tracks_description_file_path: To instantiate this class a tracklist has to be provided.
+    :param tracks_description_file_path: (optional) To instantiate this class a tracklist has to be provided.
     It can be provided from internal source "None" or can be defined with use Excel, in that case path to excel has
     to be provided to input.
-    :param depth_range: Depth range can be specified in form of (min, max) or if "None" is specified then use min and
+    :param depth_range: (optional) Depth range can be specified in form of (min, max) or if "None" is specified then use min and
     max depths in dataset to determine limits of plotting.
     """
 
@@ -110,6 +110,7 @@ class PetrophysicalTrack:
 
                 # Adjust scales and ranges,
                 self.define_scales(curve_name=curve,
+                                   curve=track_description['curves'][curve],
                                    ax=self.twins_dict[twin_id])
                 # Adjust fill between curves and appearance of curves.
                 self.define_appearance(curve_name=curve,
@@ -123,29 +124,14 @@ class PetrophysicalTrack:
         self.track_main_ax.grid(which='major', axis='y', alpha=0.8)
         self.track_main_ax.grid(which='minor', axis='y', alpha=0.3)
 
-    def define_scales(self, curve_name, ax):
+    def define_scales(self, curve_name, curve, ax):
         # Adjust scale and ranges for particular curves.
-        if curve_name in ['ResistivityDeep', 'ResistivityShallow', 'ResistivityMicro', 'PERM']:
+        if curve['scale'] == 'log':
             ax.set_xscale('log')
-            ax.set_xlim(0.1, 10000)
-        if curve_name in ['Density']:
-            ax.set_xlim(1.95, 2.95)
+        if curve['min'] != np.nan and curve['max'] != np.nan:
+            ax.set_xlim(curve['min'], curve['max'])
+        if curve['reverse']:
             ax.invert_xaxis()
-        if curve_name in ['Sonic']:
-            ax.set_xlim(40, 140)
-        if curve_name in ['Neutron']:
-            ax.set_xlim(-0.15, 0.45)
-        if curve_name in ['PhotoelectricFactor']:
-            ax.set_xlim(1, 11)
-        if curve_name in ['Caliper', 'Bitsize']:
-            ax.set_xlim(5, 21)
-
-        if curve_name in ['sPI_RU', 'sPI_RU_predicted']:
-            ax.set_xscale('log')
-            ax.set_xlim(0.002, 200)
-
-        if curve_name in ['log_sPI_RU_predicted']:
-            ax.set_xlim(np.log10(0.002), np.log10(200))
 
     def define_appearance(self, curve_name, graph_inst, ax):
 
@@ -168,13 +154,13 @@ class PetrophysicalTrack:
             ax.fill_betweenx(self.df['Depth'], self.df[curve_name], color='skyblue', alpha=0.4)
 
 
-def create_single_well_df(las_path):
+def create_single_well_df(las_path, mnem_dict_path=None):
     las = lasio.read(las_path)
     las_df = las.df()
     las_df['Well'] = las.well['UWI'].value
     las_df[las_df.index.name] = las_df.index
     las_df.reset_index(drop=True, inplace=True)
-    las_df = dataframe_preprocessor(las_df)
+    las_df = dataframe_preprocessor(las_df, mnem_dict_path=mnem_dict_path)
     return las_df
 
 

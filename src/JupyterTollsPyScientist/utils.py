@@ -29,6 +29,10 @@ def load_tracks_description(where=None):
                         'color': group['color'].values[_],
                         'label': group['label'].values[_],
                         'unit': group['unit'].values[_],
+                        'min': group['min'].values[_],
+                        'max': group['max'].values[_],
+                        'scale': group['scale'].values[_],
+                        'reverse': group['reverse'].values[_],
                          }
                    }
                 )
