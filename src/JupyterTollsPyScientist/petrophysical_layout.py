@@ -5,59 +5,64 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import lasio
 
-
-def create_single_well_df(las_path):
-    las = lasio.read(las_path)
-    las_df = las.df()
-    las_df['Well'] = las.well['UWI'].value
-    las_df[las_df.index.name] = las_df.index
-    las_df.reset_index(drop=True, inplace=True)
-    las_df = dataframe_preprocessor(las_df)
-    return las_df
+from .utils import load_tracks_description, load_mnemonic_aliases_correspond
 
 
-def dataframe_preprocessor(input_df, mnem_dict=None):
+class PetrophysicalLayout:
+    """This class serves as a base object for layout.
+    :param df: pandas dataframe with dataset from single las file.
+    :param tracks_description_file_path: To instantiate this class a tracklist has to be provided.
+    It can be provided from internal source "None" or can be defined with use Excel, in that case path to excel has
+    to be provided to input.
+    :param depth_range: Depth range can be specified in form of (min, max) or if "None" is specified then use min and
+    max depths in dataset to determine limits of plotting.
+    """
 
-    def gather_data_for_several_aliases(row, aliases_input):
-        for alias in aliases_input:
-            if not pd.isna(row[alias]):
-                return row[alias]
+    def __init__(self, df, tracks_description_file_path=None, depth_range=None):
 
-    if mnem_dict is None:
-        mnem_dict = {
-            'Well': ['Well', 'WELL'],
-            'Caliper': ['Caliper', 'CALI', 'DS'],
-            'Bitsize': ['Bitsize', 'BIT', 'BS'],
-            'Density': ['Density', 'RHOB'],
-            'Sonic': ['DTP', 'DTC', 'DT'],
-            'GR': ['GR'],
-            'CGR': ['CGR'],
-            'Neutron': ['Neutron', 'NPHI'],
-            'PhotoelectricFactor': ['PhotoelectricFactor', 'PEF'],
-            'ResistivityDeep': ['ResistivityDeep', 'RDEP', 'RT'],
-            'ResistivityShallow': ['ResistivityShallow', 'RSHA', 'RT10', 'RMED'],
-            'ResistivityMicro': ['ResistivityMicro', 'RXO'],
-            'Depth': ['DEPTH_MD', 'DEPT'],
-         }
+        self.tracks_dict = {}
+        self.df = df
+        self.depth_range = depth_range
 
-    input_df = input_df.copy()
+        if tracks_description_file_path is None:
+            self.tracks_description = load_tracks_description()
+        else:
+            self.tracks_description = load_tracks_description(tracks_description_file_path)
 
-    # Get only existing list of mnemonics
-    mnem_existing_dict = {}
-    for mnemonic, aliases in mnem_dict.items():
-        # Get the intersection while preserving the order from aliases list
-        intersection_ordered = [alias for alias in aliases if alias in set(input_df.columns)]
-        if intersection_ordered:
-            mnem_existing_dict.update({mnemonic: intersection_ordered})
+        if self.check_integrity_of_data():
+            self.fig, self.ax = plt.subplots(1, len(self.tracks_description), figsize=(20, 20))
+            self.prepare_figure()
 
-    for mnemonic, aliases in mnem_existing_dict.items():
-        input_df[mnemonic] = input_df.apply(gather_data_for_several_aliases, axis=1, args=(aliases, ))
+    def prepare_figure(self):
+        """Prepare a figure using Matplotlib, assign a number of axes to plot tracks based
+        on the provided tracks_description, and propagate the data to the axes been created."""
 
-    # Remove all columns except these which are exist in mnemonics
-    columns_to_remove = [column for column in input_df.columns if column not in mnem_existing_dict.keys()]
-    input_df.drop(columns_to_remove, axis=1, inplace=True)
+        # Drop rows if values exists less than for two columns.
+        df_dropped = self.df.dropna(thresh=2, axis=0)
 
-    return input_df
+        # Set depth range if depth range isn't specified by user.
+        if self.depth_range is None:
+            self.depth_range = (df_dropped['Depth'].min() - 15, df_dropped['Depth'].max() + 15)
+
+        # Add data in each track according to tracks_description
+        for track_id, track in enumerate(self.tracks_description):
+            self.tracks_dict.update({track_id: PetrophysicalTrack(track,
+                                                                  self.ax[track_id],
+                                                                  self.df,
+                                                                  self.depth_range)})
+
+        # Make adjustments of figure.
+        self.fig.suptitle(f"Layout of {self.df['Well'].unique()[0]}", fontsize=18, ha='left', x=0.0)
+        self.fig.tight_layout()
+
+    def check_integrity_of_data(self) -> bool:
+        """This function checks data integrity before starting the program. It returns True if
+        the data is complete or nearly complete, and False if any essential information is missing."""
+        # Check if Depth exists
+        if 'Depth' not in self.df.columns:
+            print('There is no principal curve to plot. Pray ensure that the initial set doth contain <<Depth>>.')
+            return False
+        return True
 
 
 class PetrophysicalTrack:
@@ -79,7 +84,7 @@ class PetrophysicalTrack:
         self.track_main_ax.invert_yaxis()
 
         # Create auxiliary axes and plot curves on them according to given
-        # assignment from the PetrophysicalLayout class. 
+        # assignment from the PetrophysicalLayout class.
         self.twins_dict = {}
         self.logs_dict = {}
         for twin_id, curve in enumerate(track_description['curves'].keys()):
@@ -163,100 +168,43 @@ class PetrophysicalTrack:
             ax.fill_betweenx(self.df['Depth'], self.df[curve_name], color='skyblue', alpha=0.4)
 
 
-class PetrophysicalLayout:
-    """This class serves as a base object for layout. To instantiate this class,
-    a tracklist in the form of a dictionary must be provided. Additionally, a pandas
-    DataFrame is required for initialization. The column names in the DataFrame must
-    match the keys in the <<curves>> section of the dictionary."""
+def create_single_well_df(las_path):
+    las = lasio.read(las_path)
+    las_df = las.df()
+    las_df['Well'] = las.well['UWI'].value
+    las_df[las_df.index.name] = las_df.index
+    las_df.reset_index(drop=True, inplace=True)
+    las_df = dataframe_preprocessor(las_df)
+    return las_df
 
-    base_tracks_description = [
-        {'type': 'main',
-         'curves': {'GR': {'type': 'continuous', 'color': 'magenta', 'label': 'Gamma Ray, gapi'},
-                    'RGK_CGR': {'type': 'continuous', 'color': 'orange', 'label': 'Relative (K+Th), gapi'},
-                    },
-         },
-        {'type': 'normal',
-         'curves': {'Caliper': {'type': 'continuous', 'color': 'black', 'label': 'Caliper, in'},
-                    'Bitsize': {'type': 'continuous', 'color': 'red', 'label': 'Bit-size, in'},
-                    },
-         },
-        {'type': 'normal',
-         'curves': {'Density': {'type': 'continuous', 'color': 'brown', 'label': 'Density log, g/cm3'},
-                    'Sonic': {'type': 'continuous', 'color': 'green', 'label': 'Sonic log, us/ft'},
-                    'Neutron': {'type': 'continuous', 'color': 'blue', 'label': 'Neutron log, v/v'},
-                    'PhotoelectricFactor': {'type': 'continuous', 'color': 'purple', 'label': 'PE, b/e'},
-                    },
-         },
-        {'type': 'normal',
-         'curves': {'ResistivityDeep': {'type': 'continuous', 'color': 'black', 'label': 'Deep resistivity, ohm*m'},
-                    'ResistivityShallow': {'type': 'continuous', 'color': 'red', 'label': 'Medium resistivity, ohm*m'},
-                    'ResistivityMicro': {'type': 'continuous', 'color': 'orange', 'label': 'Micro resistivity, ohm*m'},
-                    },
-         },
-        {'type': 'normal',
-         'curves': {
-             'log_sPI_RU_predicted': {'type': 'continuous', 'color': 'blue', 'label': 'log specific PI predicted'},
-             'sPI_RU_predicted': {'type': 'continuous', 'color': 'red', 'label': 'specific PI predicted'},
-             'sPI_RU': {'type': 'continuous', 'color': 'black', 'label': 'specific PI'},
-             },
-         },
-        {'type': 'normal',
-         'curves': {'POR': {'type': 'continuous', 'color': 'blue', 'label': 'Porosity, v/v'},
-                    'PERM': {'type': 'continuous', 'color': 'red', 'label': 'Permeability, mD'},
-                    },
-         },
-    ]
 
-    def __init__(self, df, tracks_description=None, depth_range=(-9999.25, 9999.25)):
+def dataframe_preprocessor(input_df, mnem_dict_path=None):
 
-        self.df = df
+    def gather_data_for_several_aliases(row, aliases_input):
+        for alias in aliases_input:
+            if not pd.isna(row[alias]):
+                return row[alias]
 
-        if tracks_description is None:
-            self.tracks_description = self.base_tracks_description
-        else:
-            self.tracks_description = tracks_description
+    if mnem_dict_path is None:
+        mnem_dict = load_mnemonic_aliases_correspond()
+    else:
+        mnem_dict = load_mnemonic_aliases_correspond(mnem_dict_path)
 
-        self.tracks_number = len(self.tracks_description)
+    output_df = input_df.copy()
 
-        self.depth_range = depth_range
-        self.integrity_test = None
-        self.tracks_dict = {}
+    # Get only existing list of mnemonics
+    mnem_existing_dict = {}
+    for mnemonic, aliases in mnem_dict.items():
+        # Get the intersection while preserving the order from aliases list
+        intersection_ordered = [alias for alias in aliases if alias in set(output_df.columns)]
+        if intersection_ordered:
+            mnem_existing_dict.update({mnemonic: intersection_ordered})
 
-        if self.check_integrity_of_data():
-            self.integrity_test = True
-        else:
-            self.integrity_test = False
+    for mnemonic, aliases in mnem_existing_dict.items():
+        output_df[mnemonic] = output_df.apply(gather_data_for_several_aliases, axis=1, args=(aliases, ))
 
-        if self.integrity_test:
-            self.fig, self.ax = plt.subplots(1, self.tracks_number, figsize=(20, 20))
-            self.prepare_figure()
+    # Remove all columns except these which are exist in mnemonics
+    columns_to_remove = [column for column in output_df.columns if column not in mnem_existing_dict.keys()]
+    output_df.drop(columns_to_remove, axis=1, inplace=True)
 
-    def prepare_figure(self):
-        """Prepare a figure using Matplotlib, assign a number of axes to plot tracks based
-        on the provided dictionary, and propagate the data to the created axes."""
-
-        # Drop values if at least three curves are not empty.
-        df_dropped = self.df.dropna(thresh=3)
-
-        # Set depth range if depth range is not specified by user.
-        if self.depth_range == (-9999.25, 9999.25):
-            self.depth_range = (df_dropped['Depth'].min() - 15, df_dropped['Depth'].max() + 15)
-
-        # Add data in each track according to tracks_description
-        for track_id, track in enumerate(self.tracks_description):
-            self.tracks_dict.update({track_id: PetrophysicalTrack(track,
-                                                                  self.ax[track_id],
-                                                                  self.df,
-                                                                  self.depth_range)})
-
-        self.fig.suptitle(f"Layout of {self.df['Well'].unique()[0]}", fontsize=18, ha='left', x=0.0)
-        self.fig.tight_layout()
-
-    def check_integrity_of_data(self) -> bool:
-        """This function checks data integrity before starting the program. It returns True if
-        the data is complete or nearly complete, and False if any essential information is missing."""
-        # Check if Depth exists
-        if 'Depth' not in self.df.columns:
-            print('There is no principal curve to plot. Pray ensure that the initial set doth contain <<Depth>>.')
-            return False
-        return True
+    return output_df
