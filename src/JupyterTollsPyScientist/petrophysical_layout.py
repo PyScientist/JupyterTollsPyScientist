@@ -68,7 +68,7 @@ class PetrophysicalLayout:
 class PetrophysicalTrack:
     def __init__(self, track_description, track_main_ax, df, depth_range):
 
-        self.df = df
+        self.df = df[(df['Depth'] > depth_range[0]) & (df['Depth'] < depth_range[1])]
         self.track_main_ax = track_main_ax
         self.depth_range = depth_range
         self.twins_dict = {}
@@ -135,8 +135,8 @@ class PetrophysicalTrack:
             ax.set_xlim(curve['min'], curve['max'])
 
         if curve['range_detection'] == 'auto':
-            max_val = self.df[curve_name].quantile(0.95)
-            min_val = self.df[curve_name].quantile(0.05)
+            max_val = self.df[curve_name].quantile(0.99)
+            min_val = self.df[curve_name].quantile(0.01)
             if not np.isnan(max_val) and not np.isnan(min_val) and max_val > min_val:
                 range_val = (max_val - min_val)*0.05
                 ax.set_xlim(self.custom_round(min_val-range_val),
