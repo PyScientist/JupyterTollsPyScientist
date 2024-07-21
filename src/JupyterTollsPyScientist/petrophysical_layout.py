@@ -1,9 +1,9 @@
 from typing import Tuple, Any
-
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import lasio
+
 
 from .utils import load_tracks_description, load_mnemonic_aliases_correspond
 
@@ -18,7 +18,10 @@ class PetrophysicalLayout:
     max depths in dataset to determine limits of plotting.
     """
 
-    def __init__(self, df, tracks_description_file_path=None, depth_range=None):
+    def __init__(self, df, tracks_description_file_path=None, depth_range=None, mode='passive'):
+
+        # Get screen dimensions
+        dpi = 100
 
         self.tracks_dict = {}
         self.df = df
@@ -30,30 +33,36 @@ class PetrophysicalLayout:
             self.tracks_description = load_tracks_description(tracks_description_file_path)
 
         if self.check_integrity_of_data():
-            self.fig, self.ax = plt.subplots(1, len(self.tracks_description), figsize=(20, 20))
+            self.fig, self.ax = plt.subplots(1, len(self.tracks_description),
+                                             dpi=dpi)
             self.prepare_figure()
+
+        if mode == 'active':
+            plt.pause(.1)  # <- NOTE THIS LINE it forces the window to display before we resize it
+            manager = plt.get_current_fig_manager()
+            manager.window.state('zoomed')
+            self.fig.subplots_adjust(top=0.78, bottom=0.05, left=0.1, right=0.9)
+            plt.show()
+        if mode == 'passive':
+            self.fig.show()
 
     def prepare_figure(self):
         """Prepare a figure using Matplotlib, assign a number of axes to plot tracks based
         on the provided tracks_description, and propagate the data to the axes been created."""
 
-        # Drop rows if values exists less than for two columns.
-        df_dropped = self.df.dropna(thresh=2, axis=0)
-
         # Set depth range if depth range isn't specified by user.
         if self.depth_range is None:
-            self.depth_range = (df_dropped['Depth'].min() - 15, df_dropped['Depth'].max() + 15)
+            self.depth_range = (self.df['Depth'].min() - 15, self.df['Depth'].max() + 15)
 
-        # Add data in each track according to tracks_description
+        # Add data in each track according to tracks_description (using PetrophysicalTrack instances)
         for track_id, track in enumerate(self.tracks_description):
             self.tracks_dict.update({track_id: PetrophysicalTrack(track,
                                                                   self.ax[track_id],
                                                                   self.df,
                                                                   self.depth_range)})
 
-        # Make adjustments of figure.
+        # Specify super title for figure.
         self.fig.suptitle(f"Layout of {self.df['Well'].unique()[0]}", fontsize=18, ha='left', x=0.0)
-        self.fig.tight_layout()
 
     def check_integrity_of_data(self) -> bool:
         """This function checks data integrity before starting the program. It returns True if
@@ -67,7 +76,6 @@ class PetrophysicalLayout:
 
 class PetrophysicalTrack:
     def __init__(self, track_description, track_main_ax, df, depth_range):
-
         self.df = df[(df['Depth'] > depth_range[0]) & (df['Depth'] < depth_range[1])]
         self.track_main_ax = track_main_ax
         self.depth_range = depth_range
@@ -93,23 +101,22 @@ class PetrophysicalTrack:
                 # Create twin of main axes for each curve and put link to it in dict.
                 self.twins_dict.update({twin_id: track_main_ax.twiny()})
                 # twin_id is sequential number of curve/points in current track.
-                shift = 1 + twin_id * 0.06
+                shift = 1 + twin_id * 0.07
                 self.twins_dict[twin_id].spines.top.set_position(("axes", shift))
 
                 graphic_link = self.twins_dict[twin_id].plot(
                         df[curve],
                         df['Depth'],
-                        color=track_description['curves'][curve]['color'],
-                        label=f"{track_description['curves'][curve]['label']}, "
-                              f"{track_description['curves'][curve]['unit']}")
+                        color=track_description['curves'][curve]['color'])
 
                 self.logs_dict.update({twin_id: graphic_link})
 
                 # Perform adjusting of auxiliary axes
-                self.twins_dict[twin_id].set(xlabel=track_description['curves'][curve]['label'])
+                label = f"{track_description['curves'][curve]['label']}, {track_description['curves'][curve]['unit']}"
+                self.twins_dict[twin_id].set(xlabel=label)
                 self.twins_dict[twin_id].xaxis.label.set_color(self.logs_dict[twin_id][0].get_color())
                 self.twins_dict[twin_id].tick_params(axis='x', colors=self.logs_dict[twin_id][0].get_color())
-                self.twins_dict[twin_id].xaxis.label.set_fontsize(18)
+                self.twins_dict[twin_id].xaxis.label.set_fontsize(12)
 
                 # Adjust scales and ranges,
                 self.define_scales(curve_name=curve,
@@ -137,13 +144,13 @@ class PetrophysicalTrack:
         if curve['range_detection'] == 'auto':
             max_val = self.df[curve_name].quantile(0.99)
             min_val = self.df[curve_name].quantile(0.01)
+            print(max_val, min_val)
             if not np.isnan(max_val) and not np.isnan(min_val) and max_val > min_val:
                 range_val = (max_val - min_val)*0.05
                 ax.set_xlim(self.custom_round(min_val-range_val),
                             self.custom_round(max_val+range_val))
             else:
-                ax.set_xlim(self.custom_round(self.df[curve_name].min()),
-                            self.custom_round(self.df[curve_name].max()))
+                pass
 
         if curve['reverse']:
             ax.invert_xaxis()

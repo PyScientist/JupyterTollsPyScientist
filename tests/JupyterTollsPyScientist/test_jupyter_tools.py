@@ -21,6 +21,7 @@ class PlottingTestCase(unittest.TestCase):
         test_basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
         self.test_df_norway = create_single_well_df(os.path.join(test_basedir, 'test_dataset\\34_10-21.las'))
         self.test_df_kansas = create_single_well_df(os.path.join(test_basedir, 'test_dataset\\1054310703.las'))
+        self.tracks_description_test_path = os.path.join(test_basedir, 'test_dataset\\tracks_description_test.xlsx')
 
     def tearDown(self):
         pass
@@ -35,11 +36,36 @@ class PlottingTestCase(unittest.TestCase):
         norway_layout = PetrophysicalLayout(self.test_df_norway)
         self.assertEqual(len(norway_layout.tracks_dict), 6)
         self.assertEqual(len(norway_layout.tracks_dict[0].logs_dict), 1)
+        # Close after testing
+        norway_layout.fig.clf()
+        plt.close(norway_layout.fig)
 
     def test_create_layout_kansas(self):
         kansas_layout = PetrophysicalLayout(self.test_df_kansas)
         self.assertEqual(len(kansas_layout.tracks_dict), 6)
+        # Close after testing
+        kansas_layout.fig.clf()
+        plt.close(kansas_layout.fig)
 
+    def test_create_layout_norway_with_depth_range(self):
+        norway_layout = PetrophysicalLayout(self.test_df_norway, depth_range=(2000, 2500))
+        # Close after testing
+        norway_layout.fig.clf()
+        plt.close(norway_layout.fig)
+
+    def test_create_layout_norway_with_depth_range_and_track_description_active_mode(self):
+        norway_layout = PetrophysicalLayout(self.test_df_norway,
+                                            tracks_description_file_path=self.tracks_description_test_path,
+                                            depth_range=(2200, 3000),
+                                            mode='active')
+        norway_layout.fig.clf()
+        plt.close(norway_layout.fig)
+
+    def test_create_layout_norway_with_depth_range_and_track_description_active_mode(self):
+        norway_layout = PetrophysicalLayout(self.test_df_kansas,
+                                            tracks_description_file_path=self.tracks_description_test_path,
+                                            depth_range=(1000, 5700),
+                                            mode='active')
 
 
 class PreparingModel(unittest.TestCase):
