@@ -18,7 +18,7 @@ Function "create_single_well_df" of module dedicated for transformation of las f
 into DataFrame with standardised curve names. For transparent procedure of the data transformation is used
 assignment file with correspondence names need to be used in dataframe and aliases in lasfile.
 
-![Alt text](docs/example_of_track_desription.png?raw=true "Title")
+![Alt text](docs/example_of_aliases.png?raw=true "Title")
 
 df = create_single_well_df(las_file_path, assignment_file_path)
 
