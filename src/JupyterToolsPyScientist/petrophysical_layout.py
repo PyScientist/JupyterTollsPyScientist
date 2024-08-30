@@ -1,11 +1,14 @@
-from typing import Tuple, Any
+from typing import Tuple, Optional, Union
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+import matplotlib.backend_bases
+import matplotlib.text
 import lasio
 
 
 from .utils import load_tracks_description, load_mnemonic_aliases_correspond
+from .calculator import Calculator
 
 
 class PetrophysicalLayout:
@@ -37,7 +40,11 @@ class PetrophysicalLayout:
                                              dpi=dpi)
             self.prepare_figure()
 
+        # noinspection PyTypeChecker
+        self.fig.canvas.mpl_connect('button_press_event', self.on_mouse_click)
+
         if mode == 'active':
+            self.marker: Optional[matplotlib.text.Text] = None
             plt.pause(.1)  # <- NOTE THIS LINE it forces the window to display before we resize it
             manager = plt.get_current_fig_manager()
             manager.window.state('zoomed')
@@ -72,6 +79,17 @@ class PetrophysicalLayout:
             print('There is no principal curve to plot. Pray ensure that the initial set doth contain <<Depth>>.')
             return False
         return True
+
+    def on_mouse_click(self, event: matplotlib.backend_bases.MouseEvent) -> None:
+        """Method which provides function to reset depth limits if limit on one of the graphs is changed."""
+        axes = event.inaxes
+        if axes is None:
+            return
+        limits = axes.get_ylim()
+        for axis in axes.figure.get_axes():
+            axis.set_ylim(*limits)
+        # Update graph
+        axes.figure.canvas.draw()
 
 
 class PetrophysicalTrack:
@@ -135,7 +153,7 @@ class PetrophysicalTrack:
         self.track_main_ax.grid(which='minor', axis='y', alpha=0.3)
 
     def define_scales(self, curve_name, curve, ax):
-        # Adjust scale and ranges for particular curves.
+        """Adjust scale and ranges for particular curves."""
         if curve['scale'] == 'log':
             ax.set_xscale('log')
         if curve['min'] != np.nan and curve['max'] != np.nan:
@@ -144,7 +162,6 @@ class PetrophysicalTrack:
         if curve['range_detection'] == 'auto':
             max_val = self.df[curve_name].quantile(0.99)
             min_val = self.df[curve_name].quantile(0.01)
-            print(max_val, min_val)
             if not np.isnan(max_val) and not np.isnan(min_val) and max_val > min_val:
                 range_val = (max_val - min_val)*0.05
                 ax.set_xlim(self.custom_round(min_val-range_val),
@@ -190,14 +207,36 @@ class PetrophysicalTrack:
 def create_single_well_df(las_path, mnem_dict_path=None):
     las = lasio.read(las_path)
     las_df = las.df()
-    las_df['Well'] = las.well['UWI'].value
+    if 'UWI' in las.well:
+        las_df['Well'] = las.well['UWI'].value
+    elif 'WELL' in las.well:
+        las_df['Well'] = las.well['WELL'].value
+    else:
+        las_df['Well'] = 'unknown'
     las_df[las_df.index.name] = las_df.index
     las_df.reset_index(drop=True, inplace=True)
     las_df = dataframe_preprocessor(las_df, mnem_dict_path=mnem_dict_path)
     return las_df
 
 
-def dataframe_preprocessor(input_df, mnem_dict_path=None):
+def make_processing_well_logging(df: pd.DataFrame) -> None:
+    """Function which perform calculating of porosity, sw, vss, etc ...
+    can be applied before plotting of layout"""
+    matrix_density = 2.71
+    fluid_density = 1
+    a = 1
+    m = 2
+    rw = 0.6
+    if 'Density' in df.columns:
+        df['Porosity_density_calc'] = df.apply(Calculator.porosity_density,
+                                               axis=1, args=(matrix_density, fluid_density, 'Density',))
+    if 'ResistivityDeep' in df.columns:
+        df['Porosity_resistivity_calc'] = df.apply(Calculator.porosity_resistivity,
+                                                   axis=1, args=(a, m, rw, 'ResistivityDeep',))
+
+
+def dataframe_preprocessor(input_df: pd.DataFrame, mnem_dict_path: Union[None, str] = None) -> pd.DataFrame:
+    """Function get df on input and looking into aliases table create set with universal names"""
 
     def gather_data_for_several_aliases(row, aliases_input):
         for alias in aliases_input:

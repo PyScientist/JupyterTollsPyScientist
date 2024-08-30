@@ -3,17 +3,19 @@ import pandas as pd
 import ctypes
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-tracks_description_base_path = os.path.join(current_dir, 'tracks_description_base.xlsx')
+assignment_base_path = os.path.join(current_dir, 'assignment_base.xlsx')
 
 
 def load_tracks_description(where=None):
-    """Function to parse excel with track descriptions and provide dictionary in appropriate format
-    :param where: Path to the Excel file with data on "tracks_description" page.
+    """Function to parse excel with track descriptions and provide dictionary in appropriate format which
+    is need fpr farther processing.
+    :param where: Path to the Excel file with data on "tracks_description" page. If file is not provided, then
+    is used the assignment_base file.
     """
     if (where is not None) and os.path.isfile(where):
         file_path = where
     else:
-        file_path = tracks_description_base_path
+        file_path = assignment_base_path
 
     if os.path.isfile(file_path):
         df = pd.read_excel(file_path, sheet_name='tracks_description')
@@ -46,13 +48,15 @@ def load_tracks_description(where=None):
 
 
 def load_mnemonic_aliases_correspond(where=None):
-    """Function to parse excel with correspond table of aliases and mnemonic and provide dict
-    :param where: Path to the Excel file with data on "aliases" page.
+    """Function to parse excel table with aliases and mnemonic correspondence and provide dictionary in format which
+    is need fpr farther processing.
+    :param where: Path to the Excel file with data on "aliases" page. If file is not provided, then
+    is used the assignment_base file.
     """
     if (where is not None) and os.path.isfile(where):
         file_path = where
     else:
-        file_path = tracks_description_base_path
+        file_path = assignment_base_path
 
     if os.path.isfile(file_path):
         mnemonic_dict = {}
