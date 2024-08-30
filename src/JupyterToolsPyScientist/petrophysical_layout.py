@@ -12,16 +12,22 @@ from .calculator import Calculator
 
 
 class PetrophysicalLayout:
-    """This class serves as a base object for layout.
+    """Class serves as a base object for layout.
     :param df: pandas dataframe with dataset from single las file.
-    :param tracks_description_file_path: (optional) To instantiate this class a tracklist has to be provided.
+    :param assignment_file_path: (optional) path to assignment file with tracks description.
     It can be provided from internal source "None" or can be defined with use Excel, in that case path to excel has
     to be provided to input.
-    :param depth_range: (optional) Depth range can be specified in form of (min, max) or if "None" is specified then use min and
-    max depths in dataset to determine limits of plotting.
+    :param depth_range: (optional) Depth range can be specified in form of tuple (min, max)
+     or if "None" is specified then use min and max depth curve in dataset to determine limits of plotting.
+    :param mode: (optional) By the default mode is 'passive' in this mode figure can be plotted inside jupyter, another
+    option to set it 'active' so it can be used from command line to plot the figure.
     """
 
-    def __init__(self, df, tracks_description_file_path=None, depth_range=None, mode='passive'):
+    def __init__(self,
+                 df: pd.DataFrame,
+                 assignment_file_path: Union['str', None] = None,
+                 depth_range: Union[tuple, None] = None,
+                 mode: str = 'passive'):
 
         # Get screen dimensions
         dpi = 100
@@ -30,10 +36,10 @@ class PetrophysicalLayout:
         self.df = df
         self.depth_range = depth_range
 
-        if tracks_description_file_path is None:
+        if assignment_file_path is None:
             self.tracks_description = load_tracks_description()
         else:
-            self.tracks_description = load_tracks_description(tracks_description_file_path)
+            self.tracks_description = load_tracks_description(assignment_file_path)
 
         if self.check_integrity_of_data():
             self.fig, self.ax = plt.subplots(1, len(self.tracks_description),
@@ -204,8 +210,13 @@ class PetrophysicalTrack:
             return round(value, 3)
 
 
-def create_single_well_df(las_path, mnem_dict_path=None):
-    las = lasio.read(las_path)
+def create_single_well_df(las_file_path: str, assignment_file_path: Union[str, None] = None):
+    """Creation of DataFrame from las file
+    :params las_file_path: Path to las file from which we are going to prepare composite df
+    :params assignment_file_path: Path to assignment Excel file with TAB "aliases". If file isn't specified
+    than the program takes default one. The example of default file provided on the figure above.
+    """
+    las = lasio.read(las_file_path)
     las_df = las.df()
     if 'UWI' in las.well:
         las_df['Well'] = las.well['UWI'].value
@@ -215,27 +226,11 @@ def create_single_well_df(las_path, mnem_dict_path=None):
         las_df['Well'] = 'unknown'
     las_df[las_df.index.name] = las_df.index
     las_df.reset_index(drop=True, inplace=True)
-    las_df = dataframe_preprocessor(las_df, mnem_dict_path=mnem_dict_path)
-    return las_df
+    return dataframe_preprocessor(las_df, assignment_file_path=assignment_file_path)
 
 
-def make_processing_well_logging(df: pd.DataFrame) -> None:
-    """Function which perform calculating of porosity, sw, vss, etc ...
-    can be applied before plotting of layout"""
-    matrix_density = 2.71
-    fluid_density = 1
-    a = 1
-    m = 2
-    rw = 0.6
-    if 'Density' in df.columns:
-        df['Porosity_density_calc'] = df.apply(Calculator.porosity_density,
-                                               axis=1, args=(matrix_density, fluid_density, 'Density',))
-    if 'ResistivityDeep' in df.columns:
-        df['Porosity_resistivity_calc'] = df.apply(Calculator.porosity_resistivity,
-                                                   axis=1, args=(a, m, rw, 'ResistivityDeep',))
-
-
-def dataframe_preprocessor(input_df: pd.DataFrame, mnem_dict_path: Union[None, str] = None) -> pd.DataFrame:
+def dataframe_preprocessor(input_df: pd.DataFrame,
+                           assignment_file_path: Union[None, str] = None) -> pd.DataFrame:
     """Function get df on input and looking into aliases table create set with universal names"""
 
     def gather_data_for_several_aliases(row, aliases_input):
@@ -243,10 +238,10 @@ def dataframe_preprocessor(input_df: pd.DataFrame, mnem_dict_path: Union[None, s
             if not pd.isna(row[alias]):
                 return row[alias]
 
-    if mnem_dict_path is None:
+    if assignment_file_path is None:
         mnem_dict = load_mnemonic_aliases_correspond()
     else:
-        mnem_dict = load_mnemonic_aliases_correspond(mnem_dict_path)
+        mnem_dict = load_mnemonic_aliases_correspond(assignment_file_path)
 
     output_df = input_df.copy()
 
@@ -266,3 +261,21 @@ def dataframe_preprocessor(input_df: pd.DataFrame, mnem_dict_path: Union[None, s
     output_df.drop(columns_to_remove, axis=1, inplace=True)
 
     return output_df
+
+
+def make_processing_well_logging(df: pd.DataFrame) -> None:
+    """Function which perform calculating of porosity, sw, vsh, etc ...
+    can be applied to DataFrame before plotting of layout
+    :param df: DataFrame for which processing will be applied.
+    """
+    matrix_density = 2.71
+    fluid_density = 1
+    a = 1
+    m = 2
+    rw = 0.6
+    if 'Density' in df.columns:
+        df['Porosity_density_calc'] = df.apply(Calculator.porosity_density,
+                                               axis=1, args=(matrix_density, fluid_density, 'Density',))
+    if 'ResistivityDeep' in df.columns:
+        df['Porosity_resistivity_calc'] = df.apply(Calculator.porosity_resistivity,
+                                                   axis=1, args=(a, m, rw, 'ResistivityDeep',))

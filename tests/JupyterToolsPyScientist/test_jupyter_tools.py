@@ -62,7 +62,7 @@ class PlottingTestCase(unittest.TestCase):
     def test_create_layout_kansas_with_depth_range_and_track_description_active_mode(self):
         make_processing_well_logging(self.test_df_kansas)
         kansas_layout = PetrophysicalLayout(self.test_df_kansas,
-                                            tracks_description_file_path=self.assignment_test_path,
+                                            assignment_file_path=self.assignment_test_path,
                                             depth_range=(1000, 5700),
                                             mode='active')
 
