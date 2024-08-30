@@ -38,8 +38,7 @@ where:
 
 df: pd.DataFrame - is DataFrame for which processing will be applied.
 
-
-![Alt text](docs/example_of_aliases.png?raw=true "Title")
+![Alt text](docs/example_of_track_desription.png?raw=true "Title")
 
 After creation of composite DataFrame and following it processing (if it needs) can be created the instance of "PetrophysicalLayout" for which can be defined the depth range, assignment file path with description how to compose tracks in layout and mode in which the layout will be created.
 The "active" mode is appropriate while we are going to work from console, then 'passive' mode, which we got as default value can be used to plot layout inside jupyter notebook.
